@@ -1,0 +1,94 @@
+{
+  "id": "hernie_inguinale_ambulatoire",
+  "titre": "Cure de hernie inguinale",
+  "description": "Parcours ambulatoire, de la consultation chirurgicale au suivi à J+30",
+  "perimetre": "Déplacements des patients, produits et gaz du bloc opératoire, énergie du bloc et de l'unité ambulatoire, biologie préopératoire, médicaments de sortie. Hors périmètre : bâtiments des consultations, repas, déplacements du personnel, déchets.",
+  "parametres": [
+    {"id": "distance_km", "libelle": "Distance domicile – hôpital (aller)", "valeur": 20, "bas": 10, "haut": 40, "unite": "km",
+     "note": "À remplacer par la distance médiane réelle des patients du service"},
+    {"id": "distance_labo_km", "libelle": "Distance domicile – laboratoire de ville (aller)", "valeur": 5, "bas": 2, "haut": 15, "unite": "km"},
+    {"id": "duree_anesthesie_h", "libelle": "Durée d'anesthésie", "valeur": 1.0, "bas": 0.75, "haut": 1.5, "unite": "h"},
+    {"id": "energie_bloc_kwh", "libelle": "Électricité du bloc par intervention (ventilation, éclairage, équipements)", "valeur": 20, "bas": 10, "haut": 40, "unite": "kWh",
+     "note": "À obtenir auprès des services techniques"},
+    {"id": "electricite_ambulatoire_kwh", "libelle": "Électricité de l'unité ambulatoire par patient", "valeur": 15, "bas": 8, "haut": 30, "unite": "kWh"},
+    {"id": "gaz_ambulatoire_kwh", "libelle": "Chauffage au gaz de l'unité ambulatoire par patient", "valeur": 20, "bas": 10, "haut": 40, "unite": "kWh"},
+    {"id": "part_hors_asa12", "libelle": "Part des patients ASA 3 ou plus (bilan toujours indiqué)", "valeur": 0.2, "bas": 0.1, "haut": 0.3, "unite": "proportion"},
+    {"id": "montant_antalgiques_eur", "libelle": "Montant des antalgiques prescrits à la sortie", "valeur": 10, "bas": 5, "haut": 20, "unite": "EUR"},
+    {"id": "part_ordonnance_ajustee", "libelle": "Part de la prescription conservée après ajustement à la durée du traitement", "valeur": 0.6, "bas": 0.4, "haut": 0.8, "unite": "proportion"},
+    {"id": "part_produits_kit_optimise", "libelle": "Part de l'empreinte des produits conservée avec un kit optimisé et des textiles réutilisables", "valeur": 0.7, "bas": 0.58, "haut": 0.77, "unite": "proportion",
+     "statut": "source", "source": "rizan2023", "note": "Rizan 2023 modélise des réductions de 23 à 42 % sur les cinq opérations étudiées"},
+    {"id": "interventions_annuelles", "libelle": "Cures de hernie inguinale par an dans le service", "valeur": 250, "bas": 250, "haut": 250, "unite": "interventions",
+     "note": "Valeur de démonstration ; source possible : Open CCAM (ATIH) par établissement"}
+  ],
+  "etapes": [
+    {
+      "id": "consultation_chirurgicale", "ordre": 1, "jour": "J-21",
+      "titre": "Consultation chirurgicale", "acteur": "Chirurgien · consultation externe",
+      "pratique_actuelle": "Consultation en présentiel",
+      "activites": [
+        {"cle": "trajet", "libelle": "Trajet aller-retour du patient en voiture", "facteur": "voiture_km", "quantite": 2, "parametres": ["distance_km"], "unite": "km"}
+      ]
+    },
+    {
+      "id": "consultation_anesthesie", "ordre": 2, "jour": "J-14",
+      "titre": "Consultation d'anesthésie", "acteur": "Anesthésiste · consultation externe",
+      "pratique_actuelle": "Un autre jour, second déplacement",
+      "activites": [
+        {"cle": "trajet", "libelle": "Second trajet aller-retour en voiture", "facteur": "voiture_km", "quantite": 2, "parametres": ["distance_km"], "unite": "km"}
+      ]
+    },
+    {
+      "id": "bilan_preoperatoire", "ordre": 3, "jour": "J-7",
+      "titre": "Bilan préopératoire", "acteur": "Laboratoire de ville",
+      "pratique_actuelle": "NFS, hémostase et ECG systématiques",
+      "activites": [
+        {"cle": "trajet", "libelle": "Trajet aller-retour au laboratoire", "facteur": "voiture_km", "quantite": 2, "parametres": ["distance_labo_km"], "unite": "km"},
+        {"cle": "biologie", "libelle": "Prélèvement, NFS et hémostase", "facteur": "bilan_sanguin_standard", "quantite": 1, "unite": "bilan"},
+        {"cle": "ecg", "libelle": "ECG de repos", "facteur": "ecg", "quantite": 1, "unite": "examen"}
+      ]
+    },
+    {
+      "id": "admission_transport", "ordre": 4, "jour": "J0",
+      "titre": "Admission et transport", "acteur": "Transport sanitaire",
+      "pratique_actuelle": "VSL aller-retour",
+      "activites": [
+        {"cle": "trajet", "libelle": "VSL aller et retour, trajets à vide du véhicule compris", "facteur": "voiture_km", "quantite": 4, "parametres": ["distance_km"], "unite": "km"}
+      ]
+    },
+    {
+      "id": "bloc_operatoire", "ordre": 5, "jour": "J0",
+      "titre": "Bloc opératoire", "acteur": "Anesthésie et chirurgie",
+      "pratique_actuelle": "Anesthésie générale au sévoflurane (2 L/min), kit à usage unique",
+      "activites": [
+        {"cle": "anesthesie", "libelle": "Sévoflurane à 2 L/min", "facteur": "sevoflurane_2l_h", "quantite": 1, "parametres": ["duree_anesthesie_h"], "unite": "h"},
+        {"cle": "produits", "libelle": "Produits et dispositifs (kit, blouses, champs, instruments)", "facteur": "produits_bloc_hernie", "quantite": 1, "unite": "intervention"},
+        {"cle": "energie", "libelle": "Électricité du bloc", "facteur": "electricite_kwh", "quantite": 1, "parametres": ["energie_bloc_kwh"], "unite": "kWh"}
+      ]
+    },
+    {
+      "id": "sspi_sortie", "ordre": 6, "jour": "J0",
+      "titre": "Salle de réveil et sortie", "acteur": "SSPI · unité ambulatoire",
+      "pratique_actuelle": "Surveillance standard",
+      "activites": [
+        {"cle": "electricite", "libelle": "Électricité de l'unité ambulatoire", "facteur": "electricite_kwh", "quantite": 1, "parametres": ["electricite_ambulatoire_kwh"], "unite": "kWh"},
+        {"cle": "chauffage", "libelle": "Chauffage de l'unité ambulatoire", "facteur": "gaz_naturel_kwh", "quantite": 1, "parametres": ["gaz_ambulatoire_kwh"], "unite": "kWh"}
+      ]
+    },
+    {
+      "id": "ordonnance_sortie", "ordre": 7, "jour": "J0",
+      "titre": "Ordonnance de sortie", "acteur": "Chirurgien",
+      "pratique_actuelle": "Antalgiques, boîtes complètes",
+      "activites": [
+        {"cle": "medicaments", "libelle": "Antalgiques délivrés", "facteur": "medicaments_euro", "quantite": 1, "parametres": ["montant_antalgiques_eur"], "unite": "EUR"}
+      ]
+    },
+    {
+      "id": "consultation_suivi", "ordre": 8, "jour": "J+30",
+      "titre": "Consultation de suivi", "acteur": "Chirurgien",
+      "pratique_actuelle": "Consultation en présentiel",
+      "activites": [
+        {"cle": "trajet", "libelle": "Trajet aller-retour en voiture", "facteur": "voiture_km", "quantite": 2, "parametres": ["distance_km"], "unite": "km"}
+      ]
+    }
+  ]
+}

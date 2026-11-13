@@ -1,0 +1,124 @@
+[
+  {
+    "id": "ademe_base_carbone",
+    "citation": "ADEME, Base Carbone (API data.ademe.fr), consultée le 13/11/2026",
+    "url": "https://data.ademe.fr/datasets/base-carboner",
+    "type": "base_donnees",
+    "note": "Identifiants des éléments cités dans chaque facteur"
+  },
+  {
+    "id": "drew2021",
+    "citation": "Drew J et al., Operating in a Climate Crisis: a state-of-the-science review of life cycle assessment within surgical and anesthetic care, Environ Health Perspect 2021",
+    "url": "https://europepmc.org/article/PMC/PMC8274692",
+    "type": "revue",
+    "corpus_id": "PMC8274692"
+  },
+  {
+    "id": "rizan2023",
+    "citation": "Rizan C et al., The carbon footprint of products used in five common surgical operations, J R Soc Med 2023",
+    "url": "https://doi.org/10.1177/01410768231166135",
+    "type": "etude",
+    "corpus_id": "PMC10331364"
+  },
+  {
+    "id": "rizan2022",
+    "citation": "Rizan C et al., Minimising carbon and financial costs of steam sterilisation and packaging of reusable surgical instruments, Br J Surg 2022",
+    "url": "https://europepmc.org/article/PMC/PMC10364739",
+    "type": "etude",
+    "corpus_id": "PMC10364739"
+  },
+  {
+    "id": "plateaux2025",
+    "citation": "Reducing surgical instrument usage: systematic review of approaches for tray optimization, BJS Open 2025",
+    "url": "https://europepmc.org/article/PMC/PMC12084675",
+    "type": "revue",
+    "corpus_id": "PMC12084675"
+  },
+  {
+    "id": "spoyalo2023",
+    "citation": "Spoyalo K et al., Patient, hospital and environmental costs of unnecessary bloodwork, BMJ Open Qual 2023",
+    "url": "https://europepmc.org/article/PMC/PMC10335441",
+    "type": "etude",
+    "corpus_id": "PMC10335441"
+  },
+  {
+    "id": "gracia2025",
+    "citation": "Gracia Martínez JL et al., Implementing a closed loop clinical decision support system for sustainable preoperative care, NPJ Digit Med 2025",
+    "url": "https://europepmc.org/article/PMC/PMC11698743",
+    "type": "etude",
+    "corpus_id": "PMC11698743"
+  },
+  {
+    "id": "sfar2012_examens",
+    "citation": "SFAR, Examens pré-interventionnels systématiques, recommandations formalisées d'experts, 2012",
+    "url": "https://sfar.org",
+    "type": "recommandation",
+    "verifie": false,
+    "note": "À télécharger et ajouter au corpus"
+  },
+  {
+    "id": "sfar2023_ag",
+    "citation": "SFAR, Réduction de l'impact environnemental de l'anesthésie générale, recommandations de pratiques professionnelles (ACCPM 2023)",
+    "url": "https://doi.org/10.1016/j.accpm.2023.101291",
+    "type": "recommandation",
+    "corpus_id": "sfar_reduction_impact_ag",
+    "verifie": false,
+    "note": "PDF à télécharger manuellement (corpus/raw/manual)"
+  },
+  {
+    "id": "sfar2024_parcours",
+    "citation": "SFAR, Écoconception du parcours patient interventionnel chirurgical, 2024",
+    "url": "https://sfar.org/download/ecoconception-du-parcours-patient-interventionnel-chirurgical/",
+    "type": "recommandation",
+    "corpus_id": "sfar_ecoconception_parcours",
+    "verifie": false,
+    "note": "PDF à télécharger manuellement (corpus/raw/manual)"
+  },
+  {
+    "id": "has_ecoconception",
+    "citation": "HAS, Pratiques professionnelles – Écoconception des soins (fiche accréditation, mise à jour 2026)",
+    "url": "https://www.has-sante.fr/upload/docs/application/pdf/2025-09/dir12/fiche_ecoconception.pdf",
+    "type": "recommandation",
+    "corpus_id": "has_fiche_ecoconception"
+  },
+  {
+    "id": "kampman2024",
+    "citation": "Kampman JM et al., Mortality and morbidity after total intravenous anaesthesia versus inhalational anaesthesia: systematic review and meta-analysis, EClinicalMedicine 2024",
+    "url": "https://europepmc.org/article/PMC/PMC11106536",
+    "type": "revue",
+    "corpus_id": "PMC11106536"
+  },
+  {
+    "id": "herniasurge2023",
+    "citation": "Stabilini C et al., Update of the international HerniaSurge guidelines for groin hernia management, BJS Open 2023",
+    "url": "https://europepmc.org/article/PMC/PMC10588975",
+    "type": "recommandation",
+    "corpus_id": "PMC10588975"
+  },
+  {
+    "id": "herniasurge2018",
+    "citation": "HerniaSurge Group, International guidelines for groin hernia management, Hernia 2018",
+    "url": "https://europepmc.org/article/PMC/PMC5809582",
+    "type": "recommandation",
+    "corpus_id": "PMC5809582"
+  },
+  {
+    "id": "muschol2022",
+    "citation": "Muschol J et al., Economic and environmental impact of digital health app video consultations in follow-up care, J Med Internet Res 2022 (essai randomisé)",
+    "url": "https://doi.org/10.2196/42839",
+    "type": "essai",
+    "corpus_id": "PMC9732751"
+  },
+  {
+    "id": "holmner2014",
+    "citation": "Holmner A et al., Carbon footprint of telemedicine solutions, PLoS One 2014",
+    "url": "https://europepmc.org/article/PMC/PMC4154849",
+    "type": "etude",
+    "corpus_id": "PMC4154849"
+  },
+  {
+    "id": "hypothese_equipe",
+    "citation": "Hypothèse de l'équipe Hippo, à valider avec le référent médical et les services de l'établissement",
+    "type": "document"
+  }
+]

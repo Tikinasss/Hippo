@@ -1,0 +1,86 @@
+[
+  {
+    "id": "voiture_km",
+    "libelle": "Voiture, motorisation moyenne",
+    "valeur": 0.256, "bas": 0.102, "haut": 0.410, "unite": "km",
+    "source": "ademe_base_carbone", "statut": "source",
+    "note": "Base Carbone élément 43791 (Valide générique), incertitude ±60 %"
+  },
+  {
+    "id": "electricite_kwh",
+    "libelle": "Électricité, mix moyen France 2024",
+    "valeur": 0.0519, "bas": 0.0467, "haut": 0.0571, "unite": "kWh",
+    "source": "ademe_base_carbone", "statut": "source",
+    "note": "Base Carbone élément 43642, incertitude ±10 %"
+  },
+  {
+    "id": "gaz_naturel_kwh",
+    "libelle": "Gaz naturel (chauffage)",
+    "valeur": 0.243, "bas": 0.231, "haut": 0.255, "unite": "kWh",
+    "source": "ademe_base_carbone", "statut": "source",
+    "note": "Base Carbone élément 13515 (kWh PCI), incertitude ±5 %"
+  },
+  {
+    "id": "medicaments_euro",
+    "libelle": "Produits pharmaceutiques (ratio monétaire)",
+    "valeur": 0.194, "bas": 0.039, "haut": 0.349, "unite": "EUR",
+    "source": "ademe_base_carbone", "statut": "source",
+    "note": "Base Carbone élément 43435 : 194 kgCO2e/k€ HT (2023), incertitude ±80 %. Ratio monétaire faute de données par molécule"
+  },
+  {
+    "id": "sevoflurane_2l_h",
+    "libelle": "Sévoflurane, débit de gaz frais 2 L/min, sans N2O",
+    "valeur": 14.5, "bas": 6.0, "haut": 23.0, "unite": "h",
+    "source": "drew2021", "statut": "source",
+    "note": "6 à 23 kgCO2e par heure à 1 MAC (Drew 2021, d'après Sherman 2012 et Hu 2021) ; valeur centrale = milieu de la fourchette"
+  },
+  {
+    "id": "sevoflurane_1l_h",
+    "libelle": "Sévoflurane, bas débit 1 L/min, sans N2O",
+    "valeur": 7.0, "bas": 3.0, "haut": 11.0, "unite": "h",
+    "source": "drew2021", "statut": "source",
+    "note": "3 à 11 kgCO2e par heure à 1 MAC (Drew 2021)"
+  },
+  {
+    "id": "propofol_h",
+    "libelle": "Propofol en AIVOC (cycle de vie)",
+    "valeur": 0.5, "bas": 0.01, "haut": 1.01, "unite": "h",
+    "source": "drew2021", "statut": "source",
+    "note": "0,01 à 1,01 kgCO2e par heure équivalent MAC (Drew 2021) ; hors incinération du propofol non utilisé"
+  },
+  {
+    "id": "anesthesie_locale_intervention",
+    "libelle": "Anesthésie locale (anesthésique local, sédation légère)",
+    "valeur": 0.2, "bas": 0.05, "haut": 0.5, "unite": "intervention",
+    "source": "hypothese_equipe", "statut": "hypothese",
+    "note": "Ordre de grandeur à documenter : quelques flacons d'anesthésique local et le petit matériel"
+  },
+  {
+    "id": "produits_bloc_hernie",
+    "libelle": "Produits utilisés pour une cure de hernie inguinale",
+    "valeur": 11.7, "bas": 10.1, "haut": 15.0, "unite": "intervention",
+    "source": "rizan2023", "statut": "source",
+    "note": "Moyenne 11,7 kgCO2e (10,1 à 15,0) observée au Royaume-Uni ; la blouse à usage unique est le premier poste"
+  },
+  {
+    "id": "bilan_sanguin_standard",
+    "libelle": "Prélèvement et bilan NFS + hémostase",
+    "valeur": 0.235, "bas": 0.165, "haut": 0.305, "unite": "bilan",
+    "source": "spoyalo2023", "statut": "source",
+    "note": "Prélèvement 150 g + tube violet 34 g + tube bleu 30 g + NFS 2,4 g + INR 18,1 g (Spoyalo 2023) ; fourchette ±30 % ajoutée par l'équipe"
+  },
+  {
+    "id": "ecg",
+    "libelle": "Électrocardiogramme de repos",
+    "valeur": 0.1, "bas": 0.05, "haut": 0.3, "unite": "examen",
+    "source": "hypothese_equipe", "statut": "hypothese",
+    "note": "Électrodes à usage unique et énergie ; à documenter"
+  },
+  {
+    "id": "teleconsultation",
+    "libelle": "Téléconsultation vidéo (terminaux et réseau)",
+    "valeur": 0.1, "bas": 0.02, "haut": 0.5, "unite": "consultation",
+    "source": "holmner2014", "statut": "hypothese",
+    "note": "Ordre de grandeur déduit des puissances et énergies grises des équipements (Holmner 2014) ; à affiner"
+  }
+]
