@@ -18,6 +18,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from .. import config  # noqa: F401  (charge backend/.env avant de lire les variables)
+
 
 class ConfigurationManquante(RuntimeError):
     """Aucune clé ou aucun modèle configuré pour le fournisseur choisi."""

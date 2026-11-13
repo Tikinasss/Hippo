@@ -31,7 +31,7 @@ python -m venv .venv
 .venv/Scripts/python -m hippo.rag build              # index de recherche du corpus
 .venv/Scripts/python -m pytest                        # tests
 
-# 3. API (l'assistant a besoin d'une clé : export ANTHROPIC_API_KEY=...)
+# 3. API (pour l'assistant : copier .env.example en .env et y mettre une clé, voir plus bas)
 .venv/Scripts/python -m uvicorn hippo.api.main:app --reload --port 8000
 ```
 
@@ -59,12 +59,7 @@ L'assistant fonctionne avec Claude ou avec toute API compatible OpenAI. Il suffi
 | Ollama (local, sans clé) | `HIPPO_LLM_PROVIDER=ollama` | `llama3.1:8b` |
 | Autre API compatible OpenAI | `HIPPO_LLM_PROVIDER=openai_compatible`, `HIPPO_LLM_BASE_URL`, `HIPPO_LLM_API_KEY`, `HIPPO_MODEL` | — |
 
-```powershell
-# PowerShell, pour la session en cours
-$env:GEMINI_API_KEY = "..."
-# Git Bash
-export GEMINI_API_KEY="..."
-```
+Le plus simple : copier `backend/.env.example` en `backend/.env` et y mettre la clé, par exemple `GEMINI_API_KEY=...`. Ce fichier est lu au démarrage de l'API et n'est jamais commité. Une variable d'environnement déjà définie garde la priorité sur le fichier.
 
 http://localhost:8000/api/sante indique le fournisseur et le modèle utilisés.
 
