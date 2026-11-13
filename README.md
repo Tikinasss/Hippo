@@ -37,6 +37,15 @@ python -m venv .venv
 
 Documentation interactive de l'API : http://localhost:8000/docs
 
+```bash
+# 4. Interface (dans un autre terminal ; relaie /api vers le backend, réglable avec HIPPO_API_URL)
+cd frontend
+npm install
+npm run dev        # http://localhost:3000
+```
+
+Pour la démo, http://localhost:3000/?scenario=demo charge directement les cinq options du scénario de pitch.
+
 | Variable | Rôle | Défaut |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | Clé de l'API Claude, pour l'assistant | — |
