@@ -1,2 +1,18 @@
 # Corpus téléchargé : licences variées (NC, ND, non précisées), on versionne le script et le manifest, pas les documents
 corpus/raw/
+# Index dérivé du corpus (se reconstruit avec : python -m hippo.rag build)
+corpus/index/
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+
+# Secrets
+.env
+.env.local
