@@ -127,3 +127,74 @@ def test_conversation_conserve_l_historique():
     assert r2["conversation_id"] == r1["conversation_id"]
     assert len(client.appels[1]["messages"]) == 3
     assert "aivoc" in client.appels[0]["messages"][0]["content"][0]["text"]
+
+
+# --- Fournisseurs compatibles OpenAI (OpenRouter, Mistral, Ollama) ------------------------
+
+from hippo.assistant.fournisseurs import ConfigurationManquante, FournisseurOpenAICompatible, creer
+
+
+class FauxOpenAI:
+    def __init__(self, reponses):
+        self.reponses = list(reponses)
+        self.appels = []
+        self.chat = NS(completions=NS(create=self._create))
+
+    def _create(self, **kw):
+        self.appels.append({**kw, "messages": list(kw["messages"])})
+        return self.reponses.pop(0)
+
+
+def oa_outil(nom, arguments, id_="c1"):
+    tc = NS(id=id_, type="function", function=NS(name=nom, arguments=arguments))
+    return NS(choices=[NS(finish_reason="tool_calls", message=NS(content=None, tool_calls=[tc]))])
+
+
+def oa_texte(t):
+    return NS(choices=[NS(finish_reason="stop", message=NS(content=t, tool_calls=None))])
+
+
+def test_openai_compatible_boucle_complete():
+    calc = Calculateur()
+    evite = calc.parcours(["aivoc"])["evite"]["central"]
+    faux = FauxOpenAI([
+        oa_outil("calculer_impact", '{"alternatives_retenues": ["aivoc"]}'),
+        oa_texte(f"L'AIVOC éviterait {evite} kgCO2e [S:drew2021]."),
+    ])
+    f = FournisseurOpenAICompatible("openrouter", client=faux, modele="un/modele")
+    r = Assistant(calc=calc, fournisseur=f).repondre("Gain de l'AIVOC ?")
+    assert r["statut"] == "ok", r
+    second = faux.appels[1]["messages"]
+    assert second[0]["role"] == "system"
+    assert second[-2]["tool_calls"][0]["function"]["name"] == "calculer_impact"
+    assert second[-1]["role"] == "tool" and second[-1]["tool_call_id"] == "c1"
+    assert faux.appels[0]["tools"][0]["type"] == "function"
+
+
+def test_openai_compatible_arguments_invalides():
+    faux = FauxOpenAI([oa_outil("calculer_impact", "{pas du json"), oa_texte("Pouvez-vous préciser ?")])
+    f = FournisseurOpenAICompatible("ollama", client=faux)
+    r = Assistant(fournisseur=f).repondre("?")
+    assert r["outils"][0]["erreur"] is True
+    assert "invalides" in faux.appels[1]["messages"][-1]["content"]
+
+
+def test_choix_du_fournisseur(monkeypatch):
+    for v in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENROUTER_API_KEY", "MISTRAL_API_KEY",
+              "HIPPO_LLM_PROVIDER", "HIPPO_MODEL", "HIPPO_LLM_API_KEY", "HIPPO_LLM_BASE_URL"):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    with pytest.raises(ConfigurationManquante):
+        creer()
+    monkeypatch.setenv("GEMINI_API_KEY", "x")
+    g = creer()
+    assert g.nom == "gemini" and "generativelanguage" in g._base_url
+    monkeypatch.delenv("GEMINI_API_KEY")
+    monkeypatch.setenv("MISTRAL_API_KEY", "x")
+    f = creer()
+    assert f.nom == "mistral" and f.modele == "mistral-large-latest"
+    monkeypatch.setenv("OPENROUTER_API_KEY", "x")
+    with pytest.raises(ConfigurationManquante, match="HIPPO_MODEL"):
+        creer("openrouter")
+    monkeypatch.setenv("HIPPO_MODEL", "fournisseur/modele")
+    assert creer().nom == "openrouter"

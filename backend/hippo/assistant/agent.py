@@ -1,66 +1,45 @@
-"""Boucle d'appel d'outils de l'assistant Hippo (API Claude, boucle manuelle).
+"""Boucle d'appel d'outils de l'assistant Hippo, indépendante du fournisseur de modèle.
 
-La boucle est écrite à la main plutôt qu'avec le tool runner pour garder la main
-sur les garde-fous : la réponse finale est contrôlée (citations, chiffres) et, en
-cas d'échec, le modèle reçoit une consigne de correction ; au second échec la
-réponse est bloquée.
+La boucle est écrite à la main pour garder la main sur les garde-fous : la réponse
+finale est contrôlée (citations, chiffres) et, en cas d'échec, le modèle reçoit une
+consigne de correction ; au second échec la réponse est bloquée.
 """
 from __future__ import annotations
 
-import os
+import json
 import uuid
 from dataclasses import dataclass, field
 
-import anthropic
-
 from ..engine import Calculateur
 from . import guardrails
+from .fournisseurs import Fournisseur, FournisseurAnthropic, creer
 from .prompts import SYSTEME
 from .tools import ContexteOutils, definitions, executer
 
-MODELE = os.environ.get("HIPPO_MODEL", "claude-opus-5-5")
-EFFORT = os.environ.get("HIPPO_EFFORT", "medium")
 MAX_TOURS = 10
 MAX_CORRECTIONS = 1
-BETAS = ["server-side-fallback-2026-07-01"]
 
 
 @dataclass
 class Conversation:
     id: str
     ctx: ContexteOutils
-    messages: list[dict] = field(default_factory=list)
+    messages: list = field(default_factory=list)
 
 
 class Assistant:
-    def __init__(self, client: anthropic.Anthropic | None = None, calc: Calculateur | None = None,
-                 modele: str = MODELE, effort: str = EFFORT) -> None:
-        self._client = client
+    def __init__(self, client=None, calc: Calculateur | None = None, fournisseur: Fournisseur | None = None) -> None:
+        # `client` : raccourci pour injecter un client Anthropic (tests)
+        self._fournisseur = fournisseur or (FournisseurAnthropic(client=client) if client is not None else None)
         self.calc = calc or Calculateur()
-        self.modele = modele
-        self.effort = effort
         self.outils = definitions(self.calc)
         self.conversations: dict[str, Conversation] = {}
 
     @property
-    def client(self) -> anthropic.Anthropic:
-        if self._client is None:
-            self._client = anthropic.Anthropic()
-        return self._client
-
-    def _appel(self, messages: list[dict]):
-        return self.client.beta.messages.create(
-            model=self.modele,
-            max_tokens=16000,
-            system=SYSTEME,
-            tools=self.outils,
-            messages=messages,
-            thinking={"type": "adaptive"},
-            output_config={"effort": self.effort},
-            cache_control={"type": "ephemeral"},
-            betas=BETAS,
-            fallbacks="default",
-        )
+    def fournisseur(self) -> Fournisseur:
+        if self._fournisseur is None:
+            self._fournisseur = creer()  # lève ConfigurationManquante si rien n'est configuré
+        return self._fournisseur
 
     def conversation(self, conversation_id: str | None) -> Conversation:
         if conversation_id and conversation_id in self.conversations:
@@ -71,48 +50,47 @@ class Assistant:
         return conv
 
     def repondre(self, question: str, conversation_id: str | None = None, retenues: list[str] | None = None) -> dict:
+        f = self.fournisseur
         conv = self.conversation(conversation_id)
-        contenu = []
+        textes = []
         if retenues is not None:
-            contenu.append({"type": "text", "text": f"[Contexte de l'écran] Alternatives déjà retenues par l'équipe : "
-                                                     f"{', '.join(retenues) or 'aucune'}."})
-        contenu.append({"type": "text", "text": question})
-        conv.messages.append({"role": "user", "content": contenu})
+            textes.append(f"[Contexte de l'écran] Alternatives déjà retenues par l'équipe : {', '.join(retenues) or 'aucune'}.")
+        textes.append(question)
+        conv.messages.extend(f.message_utilisateur(textes))
 
         trace: list[dict] = []
         corrections = 0
         for _ in range(MAX_TOURS):
-            reponse = self._appel(conv.messages)
-            conv.messages.append({"role": "assistant", "content": reponse.content})
+            tour = f.appeler(SYSTEME, self.outils, conv.messages)
+            conv.messages.append(tour.message)
 
-            if reponse.stop_reason == "pause_turn":
+            if tour.fin == "pause":
                 continue
-            if reponse.stop_reason == "tool_use":
+            if tour.fin == "outils":
                 resultats = []
-                for bloc in reponse.content:
-                    if bloc.type != "tool_use":
-                        continue
-                    sortie, erreur = executer(conv.ctx, bloc.name, dict(bloc.input))
-                    trace.append({"outil": bloc.name, "arguments": dict(bloc.input), "erreur": erreur})
-                    resultats.append({"type": "tool_result", "tool_use_id": bloc.id, "content": sortie,
-                                      **({"is_error": True} if erreur else {})})
-                conv.messages.append({"role": "user", "content": resultats})
+                for appel in tour.appels:
+                    if appel.arguments is None:
+                        sortie, erreur = json.dumps({"erreur": "arguments JSON invalides, réessayer"}), True
+                    else:
+                        sortie, erreur = executer(conv.ctx, appel.nom, appel.arguments)
+                    trace.append({"outil": appel.nom, "arguments": appel.arguments, "erreur": erreur})
+                    resultats.append((appel.id, sortie, erreur))
+                conv.messages.extend(f.resultats_outils(resultats))
                 continue
-            if reponse.stop_reason == "refusal":
+            if tour.fin == "refus":
                 return self._resultat(conv, "refus", "Cette demande ne peut pas être traitée par l'assistant.", trace)
-            if reponse.stop_reason == "max_tokens":
+            if tour.fin == "longueur":
                 return self._resultat(conv, "tronquee", "La réponse a été interrompue (longueur maximale). "
                                                         "Reformulez la question de façon plus ciblée.", trace)
 
-            texte = "".join(b.text for b in reponse.content if b.type == "text").strip()
-            verif = guardrails.verifier(texte, set(conv.ctx.sources_vues), conv.ctx.nombres)
+            verif = guardrails.verifier(tour.texte, set(conv.ctx.sources_vues), conv.ctx.nombres)
             if verif.ok:
-                texte_num, refs = guardrails.numeroter(texte, conv.ctx.sources_vues)
+                texte_num, refs = guardrails.numeroter(tour.texte, conv.ctx.sources_vues)
                 return self._resultat(conv, "ok", texte_num, trace, refs, verif)
             if corrections < MAX_CORRECTIONS:
                 corrections += 1
                 trace.append({"controle": verif.to_dict()})
-                conv.messages.append({"role": "user", "content": [{"type": "text", "text": verif.consigne_correction()}]})
+                conv.messages.extend(f.message_utilisateur([verif.consigne_correction()]))
                 continue
             return self._resultat(
                 conv, "bloquee",

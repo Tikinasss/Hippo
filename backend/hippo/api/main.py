@@ -13,7 +13,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from ..action_plan import construire_fiche, rendre_html
+import openai
+
 from ..assistant import Assistant
+from ..assistant.fournisseurs import ConfigurationManquante, nom_par_defaut
 from ..engine import Calculateur, ConflitAlternatives
 from ..rag import load_index
 
@@ -56,7 +59,11 @@ def _source(sid: str) -> dict:
 
 @app.get("/api/sante")
 def sante() -> dict:
-    return {"ok": True, "assistant_configure": bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))}
+    try:
+        f = assistant().fournisseur
+        return {"ok": True, "assistant_configure": True, "fournisseur": f.nom, "modele": f.modele}
+    except ConfigurationManquante as exc:
+        return {"ok": True, "assistant_configure": False, "fournisseur": nom_par_defaut(), "detail": str(exc)}
 
 
 @app.get("/api/parcours")
@@ -147,15 +154,13 @@ class Question(BaseModel):
 def poser_question(q: Question) -> dict:
     try:
         return assistant().repondre(q.question, q.conversation_id, q.retenues)
-    except anthropic.AuthenticationError as exc:
-        raise HTTPException(503, "Clé d'API Anthropic invalide ou absente (ANTHROPIC_API_KEY).") from exc
-    except anthropic.RateLimitError as exc:
+    except ConfigurationManquante as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except (anthropic.AuthenticationError, openai.AuthenticationError) as exc:
+        raise HTTPException(503, "Clé d'API du modèle invalide.") from exc
+    except (anthropic.RateLimitError, openai.RateLimitError) as exc:
         raise HTTPException(429, "Limite de requêtes atteinte, réessayez dans un instant.") from exc
-    except anthropic.APIConnectionError as exc:
+    except (anthropic.APIConnectionError, openai.APIConnectionError) as exc:
         raise HTTPException(503, "Service du modèle injoignable.") from exc
-    except anthropic.APIStatusError as exc:
+    except (anthropic.APIStatusError, openai.APIStatusError) as exc:
         raise HTTPException(502, f"Erreur du service du modèle ({exc.status_code}).") from exc
-    except TypeError as exc:  # client construit sans aucune information d'authentification
-        if "api_key" in str(exc) or "auth" in str(exc).lower():
-            raise HTTPException(503, "Assistant non configuré : définissez ANTHROPIC_API_KEY.") from exc
-        raise

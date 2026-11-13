@@ -46,11 +46,32 @@ npm run dev        # http://localhost:3000
 
 Pour la démo, http://localhost:3000/?scenario=demo charge directement les cinq options du scénario de pitch.
 
-| Variable | Rôle | Défaut |
+### Modèle de l'assistant
+
+L'assistant fonctionne avec Claude ou avec toute API compatible OpenAI. Il suffit de définir **une** clé : le fournisseur est détecté automatiquement (dans cet ordre). Les outils, les citations et les garde-fous sont les mêmes partout ; seule la qualité des réponses varie selon le modèle.
+
+| Fournisseur | Variable à définir | Modèle par défaut (`HIPPO_MODEL` pour changer) |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Clé de l'API Claude, pour l'assistant | — |
-| `HIPPO_MODEL` | Modèle de l'assistant | `claude-opus-5-5` |
-| `HIPPO_EFFORT` | Effort de réflexion (`low`, `medium`, `high`) | `medium` |
+| Claude (Anthropic) | `ANTHROPIC_API_KEY` | `claude-opus-5-5` |
+| OpenRouter | `OPENROUTER_API_KEY` + `HIPPO_MODEL` (obligatoire, un modèle qui gère les outils) | — |
+| Mistral | `MISTRAL_API_KEY` | `mistral-large-latest` |
+| Gemini | `GEMINI_API_KEY` | `gemini-2.5-flash` |
+| Ollama (local, sans clé) | `HIPPO_LLM_PROVIDER=ollama` | `llama3.1:8b` |
+| Autre API compatible OpenAI | `HIPPO_LLM_PROVIDER=openai_compatible`, `HIPPO_LLM_BASE_URL`, `HIPPO_LLM_API_KEY`, `HIPPO_MODEL` | — |
+
+```powershell
+# PowerShell, pour la session en cours
+$env:GEMINI_API_KEY = "..."
+# Git Bash
+export GEMINI_API_KEY="..."
+```
+
+http://localhost:8000/api/sante indique le fournisseur et le modèle utilisés.
+
+| Autre variable | Rôle | Défaut |
+| --- | --- | --- |
+| `HIPPO_LLM_PROVIDER` | Forcer un fournisseur | détecté |
+| `HIPPO_EFFORT` | Effort de réflexion, Claude uniquement (`low`, `medium`, `high`) | `medium` |
 | `HIPPO_CORS_ORIGINS` | Origines autorisées pour l'interface | `http://localhost:3000` |
 
 ## Principes de conception
