@@ -99,6 +99,7 @@ class Alternative(BaseModel):
     conditions: str | None = None
     vigilance: list[str] = Field(default_factory=list)
     effets_indirects: list[str] = Field(default_factory=list)
+    indicateur: str | None = Field(None, description="Indicateur de suivi pour le plan d'action")
     sources: list[str] = Field(..., min_length=1, description="Pas de suggestion sans source")
     remplace: dict[str, list[Activite]] = Field(
         ..., description="Pour chaque poste (cle) de l'étape, les nouvelles activités ; liste vide = poste supprimé"

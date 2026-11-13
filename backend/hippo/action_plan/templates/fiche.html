@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{titre}}</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  :root { --ink: #1B2733; --muted: #51606F; --line: #D5DCE3; --blue: #0A5FA8; --green: #12733F; --bg: #F5F7FA; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12.5px; line-height: 1.45; color: var(--ink); background: #fff; }
+  header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid var(--blue); padding-bottom: 10px; margin-bottom: 14px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 18px 0 6px; color: var(--blue); }
+  .muted { color: var(--muted); }
+  .range { color: var(--muted); font-size: 11px; }
+  .meta { text-align: right; font-size: 11.5px; color: var(--muted); }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kpi { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--bg); }
+  .kpi b { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .kpi span.v { font-size: 15px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 6px; text-align: left; vertical-align: top; }
+  th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  td.num { white-space: nowrap; color: var(--green); font-weight: 600; }
+  td.blank { min-width: 80px; }
+  tr.sub td { background: var(--bg); font-size: 11.5px; border-bottom: 2px solid var(--line); }
+  ul { margin: 4px 0; padding-left: 18px; }
+  .note { margin-top: 14px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 11.5px; }
+  footer { margin-top: 18px; font-size: 11px; color: var(--muted); }
+  .print { position: fixed; top: 12px; right: 12px; padding: 8px 14px; border: 0; border-radius: 6px; background: var(--blue); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  @media print { .print { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+<button class="print" type="button" onclick="window.print()">Enregistrer en PDF</button>
+<header>
+  <div>
+    <h1>{{titre}}</h1>
+    <div class="muted">{{critere}}</div>
+  </div>
+  <div class="meta">{{etablissement}}<br>{{service}}<br>Établie le {{date}} · {{auteur}}</div>
+</header>
+
+<h2>Impact du parcours (par patient)</h2>
+<div class="kpis">
+  <div class="kpi"><b>Actuel</b><span class="v">{{avant}}</span></div>
+  <div class="kpi"><b>Après actions</b><span class="v">{{apres}}</span></div>
+  <div class="kpi"><b>Évité</b><span class="v">{{evite}}</span></div>
+  <div class="kpi"><b>Réduction</b><span class="v">−{{reduction}} %</span></div>
+</div>
+<p>Sur un an : {{annuel}}.</p>
+
+<h2>Actions retenues par l'équipe</h2>
+<table>
+  <thead><tr><th>Action</th><th>Statut</th><th>Gain / patient</th><th>Indicateur de suivi</th><th>Responsable</th><th>Échéance</th></tr></thead>
+  <tbody>{{actions}}</tbody>
+</table>
+
+{{discussion}}
+
+<h2>Hypothèses à valider</h2>
+<p class="muted">{{part_hypotheses}} % de l'impact calculé repose sur au moins une hypothèse. Les fourchettes combinent les bornes basses et hautes des facteurs et des hypothèses.</p>
+<ul>{{hypotheses}}</ul>
+
+<h2>Périmètre</h2>
+<p>{{perimetre}}</p>
+
+<h2>Sources</h2>
+<ul>{{sources}}</ul>
+
+<div class="note">Document généré par Hippo à partir des choix de l'équipe soignante. Hippo propose des alternatives documentées ; les décisions cliniques restent à l'équipe. Aucune donnée patient n'est utilisée.</div>
+<footer>Hippo · prototype hackathon AI for Health</footer>
+</body>
+</html>
