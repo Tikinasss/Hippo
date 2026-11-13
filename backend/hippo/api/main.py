@@ -162,5 +162,12 @@ def poser_question(q: Question) -> dict:
         raise HTTPException(429, "Limite de requêtes atteinte, réessayez dans un instant.") from exc
     except (anthropic.APIConnectionError, openai.APIConnectionError) as exc:
         raise HTTPException(503, "Service du modèle injoignable.") from exc
+    except (anthropic.APITimeoutError, openai.APITimeoutError) as exc:
+        raise HTTPException(504, "Le modèle met trop de temps à répondre. Réessayez, ou changez de modèle.") from exc
     except (anthropic.APIStatusError, openai.APIStatusError) as exc:
+        if exc.status_code in (503, 529):
+            raise HTTPException(503, "Le modèle est surchargé chez le fournisseur. Réessayez dans un instant, "
+                                     "ou changez de modèle (HIPPO_MODEL).") from exc
+        if exc.status_code == 404:
+            raise HTTPException(502, "Modèle introuvable chez le fournisseur : vérifiez HIPPO_MODEL.") from exc
         raise HTTPException(502, f"Erreur du service du modèle ({exc.status_code}).") from exc

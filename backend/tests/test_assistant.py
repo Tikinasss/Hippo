@@ -198,3 +198,13 @@ def test_choix_du_fournisseur(monkeypatch):
         creer("openrouter")
     monkeypatch.setenv("HIPPO_MODEL", "fournisseur/modele")
     assert creer().nom == "openrouter"
+
+
+def test_plusieurs_sources_dans_un_marqueur_et_noms_d_outils_retires():
+    vues = {"a": {"id": "a", "citation": "A"}, "b": {"id": "b", "citation": "B"}}
+    texte = "Gain 14 kgCO2e [chercher_alternatives: aivoc]. Recommandé [S:a, S:b] ; voir [S:b; a]."
+    v = verifier(texte, set(vues), {14.0})
+    assert v.ok and v.citations_valides == ["a", "b"]
+    sortie, refs = numeroter(texte, vues)
+    assert sortie == "Gain 14 kgCO2e. Recommandé [1][2] ; voir [2][1]."
+    assert len(refs) == 2

@@ -18,6 +18,9 @@ from .tools import ContexteOutils, definitions, executer
 
 MAX_TOURS = 10
 MAX_CORRECTIONS = 1
+MAX_RECHERCHES = 3  # appels à chercher_sources par question
+CONSIGNE_CONCLURE = ("[Contrôle automatique Hippo] Plus d'appel d'outil possible pour cette question : réponds "
+                     "maintenant avec les résultats déjà obtenus, en citant leurs identifiants [S:id].")
 
 
 @dataclass
@@ -60,7 +63,8 @@ class Assistant:
 
         trace: list[dict] = []
         corrections = 0
-        for _ in range(MAX_TOURS):
+        recherches = 0
+        for n_tour in range(MAX_TOURS):
             tour = f.appeler(SYSTEME, self.outils, conv.messages)
             conv.messages.append(tour.message)
 
@@ -71,11 +75,17 @@ class Assistant:
                 for appel in tour.appels:
                     if appel.arguments is None:
                         sortie, erreur = json.dumps({"erreur": "arguments JSON invalides, réessayer"}), True
+                    elif appel.nom == "chercher_sources" and recherches >= MAX_RECHERCHES:
+                        sortie, erreur = json.dumps({"erreur": "Limite de recherches atteinte : réponds avec les "
+                                                               "extraits déjà obtenus."}, ensure_ascii=False), True
                     else:
+                        recherches += appel.nom == "chercher_sources"
                         sortie, erreur = executer(conv.ctx, appel.nom, appel.arguments)
                     trace.append({"outil": appel.nom, "arguments": appel.arguments, "erreur": erreur})
                     resultats.append((appel.id, sortie, erreur))
-                conv.messages.extend(f.resultats_outils(resultats))
+                # avant le dernier tour autorisé, on demande explicitement de conclure
+                note = CONSIGNE_CONCLURE if n_tour >= MAX_TOURS - 3 else None
+                conv.messages.extend(f.resultats_outils(resultats, note))
                 continue
             if tour.fin == "refus":
                 return self._resultat(conv, "refus", "Cette demande ne peut pas être traitée par l'assistant.", trace)

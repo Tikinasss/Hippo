@@ -11,7 +11,20 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-MARQUEUR = re.compile(r"\[S:([^\]\s]+)\]")
+MARQUEUR = re.compile(r"\[S:([^\]]+)\]")
+# Noms d'outils que certains modèles recopient dans le texte : « [calculer_impact] », « [chercher_alternatives: aivoc] »
+_TRACE_OUTIL = re.compile(
+    r"\s*\[(?:calculer_impact|chercher_alternatives|expliquer_calcul|chercher_sources|preparer_fiche_action)[^\]]*\]"
+)
+
+
+def _ids(contenu: str) -> list[str]:
+    """« sfar2023_ag » ou « herniasurge2023, S:herniasurge2018 » -> identifiants."""
+    return [i.strip().removeprefix("S:").strip() for i in re.split(r"[,;]", contenu) if i.strip()]
+
+
+def nettoyer(texte: str) -> str:
+    return _TRACE_OUTIL.sub("", texte)
 _CHIFFRE_CO2 = re.compile(
     r"(?<![\w.,])[−-]?(\d+(?:[.,]\d+)?)\s*(?:%|(?:k?g|t)\s*(?:de\s+)?CO\s*(?:2|₂)e?)", re.IGNORECASE
 )
@@ -61,7 +74,8 @@ def _trace(valeur: float, nombres: set[float]) -> bool:
 
 def verifier(texte: str, sources_vues: set[str], nombres: set[float]) -> Verification:
     v = Verification()
-    for sid in dict.fromkeys(MARQUEUR.findall(texte)):
+    texte = nettoyer(texte)
+    for sid in dict.fromkeys(i for m in MARQUEUR.findall(texte) for i in _ids(m)):
         (v.citations_valides if sid in sources_vues else v.citations_inconnues).append(sid)
     for m in _CHIFFRE_CO2.finditer(texte):
         valeur = float(m.group(1).replace(",", "."))
@@ -77,13 +91,14 @@ def numeroter(texte: str, sources_vues: dict[str, dict]) -> tuple[str, list[dict
     ordre: dict[str, int] = {}
 
     def remplacer(m: re.Match) -> str:
-        sid = m.group(1)
-        if sid not in sources_vues:
-            return ""
-        ordre.setdefault(sid, len(ordre) + 1)
-        return f"[{ordre[sid]}]"
+        numeros = []
+        for sid in _ids(m.group(1)):
+            if sid in sources_vues:
+                ordre.setdefault(sid, len(ordre) + 1)
+                numeros.append(f"[{ordre[sid]}]")
+        return "".join(dict.fromkeys(numeros))
 
-    texte = MARQUEUR.sub(remplacer, texte)
+    texte = MARQUEUR.sub(remplacer, nettoyer(texte))
     texte = re.sub(r"(\[\d+\])(?:\s*\1)+", r"\1", texte)
     refs = [{"numero": n, **sources_vues[sid]} for sid, n in ordre.items()]
     return texte, refs

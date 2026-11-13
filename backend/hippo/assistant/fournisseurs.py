@@ -47,7 +47,7 @@ class Fournisseur(Protocol):
 
     def appeler(self, systeme: str, outils: list[dict], messages: list) -> Tour: ...
     def message_utilisateur(self, textes: list[str]) -> list: ...
-    def resultats_outils(self, resultats: list[tuple[str, str, bool]]) -> list: ...
+    def resultats_outils(self, resultats: list[tuple[str, str, bool]], note: str | None = None) -> list: ...
 
 
 # --- Claude (SDK Anthropic) ----------------------------------------------------------
@@ -92,11 +92,14 @@ class FournisseurAnthropic:
     def message_utilisateur(self, textes: list[str]) -> list:
         return [{"role": "user", "content": [{"type": "text", "text": t} for t in textes]}]
 
-    def resultats_outils(self, resultats: list[tuple[str, str, bool]]) -> list:
-        return [{"role": "user", "content": [
+    def resultats_outils(self, resultats: list[tuple[str, str, bool]], note: str | None = None) -> list:
+        contenu = [
             {"type": "tool_result", "tool_use_id": i, "content": c, **({"is_error": True} if e else {})}
             for i, c, e in resultats
-        ]}]
+        ]
+        if note:
+            contenu.append({"type": "text", "text": note})
+        return [{"role": "user", "content": contenu}]
 
 
 # --- API compatibles OpenAI (OpenRouter, Mistral, Ollama…) --------------------------------
@@ -105,7 +108,7 @@ PRESETS = {
     "openrouter": {"base_url": "https://openrouter.ai/api/v1", "cle": "OPENROUTER_API_KEY", "modele": None},
     "mistral": {"base_url": "https://api.mistral.ai/v1", "cle": "MISTRAL_API_KEY", "modele": "mistral-large-latest"},
     "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai/", "cle": "GEMINI_API_KEY",
-               "modele": "gemini-2.5-flash"},
+               "modele": "gemini-3.8-flash"},
     "ollama": {"base_url": "http://localhost:11434/v1", "cle": None, "modele": "llama3.1:8b"},
     "openai_compatible": {"base_url": None, "cle": "HIPPO_LLM_API_KEY", "modele": None},
 }
@@ -135,7 +138,8 @@ class FournisseurOpenAICompatible:
         if self._client is None:
             from openai import OpenAI
 
-            self._client = OpenAI(base_url=self._base_url, api_key=self._cle)
+            # Délai borné : un modèle surchargé échoue vite au lieu de bloquer l'écran plusieurs minutes
+            self._client = OpenAI(base_url=self._base_url, api_key=self._cle, timeout=90, max_retries=1)
         return self._client
 
     @staticmethod
@@ -154,7 +158,7 @@ class FournisseurOpenAICompatible:
         )
         choix = r.choices[0]
         msg = choix.message
-        appels = []
+        appels, renvoyes = [], []
         for tc in msg.tool_calls or []:
             try:
                 args = json.loads(tc.function.arguments or "{}")
@@ -162,19 +166,33 @@ class FournisseurOpenAICompatible:
             except json.JSONDecodeError:
                 args = None
             appels.append(AppelOutil(tc.id, tc.function.name, args, tc.function.arguments or ""))
+            # Renvoyer l'appel complet : Gemini 3 exige sa « thought_signature » (extra_content) au tour suivant
+            if hasattr(tc, "model_dump"):
+                d = tc.model_dump(exclude_none=True)
+                d.setdefault("type", "function")
+                d["function"]["arguments"] = d["function"].get("arguments") or "{}"
+            else:
+                d = {"id": tc.id, "type": "function",
+                     "function": {"name": tc.function.name, "arguments": tc.function.arguments or "{}"}}
+            renvoyes.append(d)
         fin = "outils" if appels else {"length": "longueur", "content_filter": "refus"}.get(choix.finish_reason, "fin")
         message = {"role": "assistant", "content": msg.content or ""}
-        if appels:
-            message["tool_calls"] = [
-                {"id": a.id, "type": "function", "function": {"name": a.nom, "arguments": a.brut or "{}"}} for a in appels
-            ]
+        if renvoyes:
+            message["tool_calls"] = renvoyes
+        # OpenRouter : le raisonnement de certains modèles doit aussi être renvoyé tel quel
+        extra = getattr(msg, "model_extra", None) or {}
+        if extra.get("reasoning_details"):
+            message["reasoning_details"] = extra["reasoning_details"]
         return Tour(fin=fin, texte=(msg.content or "").strip(), appels=appels, message=message)
 
     def message_utilisateur(self, textes: list[str]) -> list:
         return [{"role": "user", "content": "\n\n".join(textes)}]
 
-    def resultats_outils(self, resultats: list[tuple[str, str, bool]]) -> list:
-        return [{"role": "tool", "tool_call_id": i, "content": c} for i, c, _ in resultats]
+    def resultats_outils(self, resultats: list[tuple[str, str, bool]], note: str | None = None) -> list:
+        messages = [{"role": "tool", "tool_call_id": i, "content": c} for i, c, _ in resultats]
+        if note:
+            messages.append({"role": "user", "content": note})
+        return messages
 
 
 # --- Choix --------------------------------------------------------------------------------
