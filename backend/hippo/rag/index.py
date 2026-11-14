@@ -32,6 +32,9 @@ def build_index(
         for c in chunks:
             f.write(json.dumps(c.to_dict(), ensure_ascii=False) + "\n")
     load_index.cache_clear()
+    from .recherche import moteur_recherche
+
+    moteur_recherche.cache_clear()
     return {"documents": len({c.doc_id for c in chunks}), "chunks": len(chunks), "skipped": skipped}
 
 
@@ -89,6 +92,35 @@ class CorpusIndex:
         with path.open(encoding="utf-8") as f:
             return cls([json.loads(line) for line in f if line.strip()])
 
+    def filtre(self, themes: list[str] | None = None, reuse: list[str] | None = None) -> set[int] | None:
+        if not (themes or reuse):
+            return None
+        return {
+            i
+            for i, c in enumerate(self.chunks)
+            if (not themes or c["meta"].get("theme") in themes) and (not reuse or c["meta"].get("reuse") in reuse)
+        }
+
+    def position(self, chunk_id: str) -> int | None:
+        if not hasattr(self, "_positions"):
+            self._positions = {c["id"]: i for i, c in enumerate(self.chunks)}
+        return self._positions.get(chunk_id)
+
+    def hits(self, classement, k: int = 5, per_doc: int = 2) -> list[Hit]:
+        """Transforme un classement [(position, score)] en résultats, avec au plus `per_doc` passages par document."""
+        hits: list[Hit] = []
+        per_doc_count: dict[str, int] = {}
+        for i, score in classement:
+            c = self.chunks[i]
+            if per_doc_count.get(c["doc_id"], 0) >= per_doc:
+                continue  # diversité : pas plus de `per_doc` passages du même document
+            per_doc_count[c["doc_id"]] = per_doc_count.get(c["doc_id"], 0) + 1
+            hits.append(Hit(chunk_id=c["id"], doc_id=c["doc_id"], title=c["title"], heading=c["heading"],
+                            text=c["text"], page=c.get("page"), score=score, meta=c["meta"]))
+            if len(hits) == k:
+                break
+        return hits
+
     def search(
         self,
         query: str,
@@ -97,36 +129,8 @@ class CorpusIndex:
         reuse: list[str] | None = None,
         per_doc: int = 2,
     ) -> list[Hit]:
-        allowed = None
-        if themes or reuse:
-            allowed = {
-                i
-                for i, c in enumerate(self.chunks)
-                if (not themes or c["meta"].get("theme") in themes)
-                and (not reuse or c["meta"].get("reuse") in reuse)
-            }
-        hits: list[Hit] = []
-        per_doc_count: dict[str, int] = {}
-        for i, score in self.bm25.top(tokenize(query), k * 4, allowed):
-            c = self.chunks[i]
-            if per_doc_count.get(c["doc_id"], 0) >= per_doc:
-                continue  # diversité : pas plus de `per_doc` passages du même document
-            per_doc_count[c["doc_id"]] = per_doc_count.get(c["doc_id"], 0) + 1
-            hits.append(
-                Hit(
-                    chunk_id=c["id"],
-                    doc_id=c["doc_id"],
-                    title=c["title"],
-                    heading=c["heading"],
-                    text=c["text"],
-                    page=c.get("page"),
-                    score=score,
-                    meta=c["meta"],
-                )
-            )
-            if len(hits) == k:
-                break
-        return hits
+        """Recherche par mots-clés seuls (BM25)."""
+        return self.hits(self.bm25.top(tokenize(query), k * 4, self.filtre(themes, reuse)), k=k, per_doc=per_doc)
 
     def get_chunk(self, chunk_id: str) -> dict | None:
         return next((c for c in self.chunks if c["id"] == chunk_id), None)

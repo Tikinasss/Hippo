@@ -12,7 +12,7 @@ import urllib.parse
 from dataclasses import dataclass, field
 
 from ..engine import Calculateur, ConflitAlternatives
-from ..rag import load_index
+from ..rag.recherche import moteur_recherche
 
 _NOMBRE = re.compile(r"-?\d+(?:\.\d+)?")
 THEMES = ["parcours_hernie", "parcours_global", "bloc_consommables", "bloc_anesthesie",
@@ -98,9 +98,10 @@ def definitions(calc: Calculateur) -> list[dict]:
         {
             "name": "chercher_sources",
             "description": (
-                "Recherche plein texte dans le corpus de sources (recommandations HerniaSurge, SFAR, HAS, articles "
-                "d'analyse de cycle de vie, essais). Le corpus est surtout en anglais : formuler la requête en "
-                "anglais avec des mots-clés précis (ex. « local anaesthesia inguinal hernia recommendation »). "
+                "Recherche dans le corpus de sources (recommandations HerniaSurge, SFAR, HAS, articles d'analyse "
+                "de cycle de vie, essais), par mots-clés et par le sens. Le corpus est surtout en anglais : "
+                "formuler la requête en anglais avec des termes précis (ex. « local anaesthesia inguinal hernia "
+                "recommendation »). "
                 "Renvoie des extraits avec leur identifiant à citer."
             ),
             "strict": True,
@@ -201,7 +202,7 @@ def _expliquer_calcul(ctx: ContexteOutils, etape: str) -> dict:
 
 def _chercher_sources(ctx: ContexteOutils, requete_en_anglais: str, theme: str) -> dict:
     themes = None if theme in (None, "tous") else [theme]
-    hits = load_index().search(requete_en_anglais, k=5, themes=themes)
+    hits = moteur_recherche().chercher(requete_en_anglais, k=5, themes=themes)
     out = []
     for h in hits:
         d = h.to_dict(900)

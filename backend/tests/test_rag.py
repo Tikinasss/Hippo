@@ -72,3 +72,60 @@ def test_index_filters_by_theme_and_limits_per_doc():
     hits = idx.search("video", themes=["bloc"])
     assert [h.doc_id for h in hits] == ["b"]
     assert hits[0].citation.startswith("Doe J et al., J, 2024")
+
+
+# --- Recherche hybride (embeddings simulés, sans réseau) --------------------------------------
+
+import numpy as np
+
+from hippo.rag.embeddings import DIM, VecteursFichier
+from hippo.rag.recherche import MoteurRecherche
+
+
+class FauxEmbeddeur:
+    modele = "faux"
+
+    def __init__(self, vecteurs):
+        self.vecteurs = vecteurs
+
+    def encoder_requete(self, texte):
+        return self.vecteurs[texte]
+
+
+def _vecteurs(chunks, matrice):
+    return VecteursFichier([c["id"] for c in chunks], ["e"] * len(chunks), matrice, "faux",
+                           {c["id"]: (c["meta"]["theme"], None) for c in chunks})
+
+
+def test_hybride_trouve_par_le_sens_ce_que_les_mots_ratent():
+    chunks = [_chunk(0, "a", "sevoflurane carbon footprint", "t"), _chunk(0, "b", "local anaesthesia hernia repair", "t"),
+              _chunk(0, "c", "unrelated text about bicycles", "t")]
+    base = np.eye(3, DIM, dtype=np.float32)
+    q = base[1] * 0.9 + base[2] * 0.1
+    question = "anesthésie locale de la hernie"  # aucun mot commun avec le passage b
+    moteur = MoteurRecherche(CorpusIndex(chunks), FauxEmbeddeur({question: q / np.linalg.norm(q)}),
+                             _vecteurs(chunks, base))
+    assert moteur.mode == "hybride"
+    assert moteur.chercher(question, k=1)[0].doc_id == "b"
+    assert MoteurRecherche(CorpusIndex(chunks)).chercher(question, k=1) == []
+
+
+def test_hybride_se_replie_sur_les_mots_cles_si_le_service_echoue():
+    chunks = [_chunk(0, "a", "sevoflurane carbon footprint", "t")]
+
+    class Panne:
+        modele = "faux"
+
+        def encoder_requete(self, texte):
+            raise ConnectionError("hors ligne")
+
+    moteur = MoteurRecherche(CorpusIndex(chunks), Panne(), _vecteurs(chunks, np.eye(1, DIM, dtype=np.float32)))
+    assert moteur.chercher("sevoflurane", k=1)[0].doc_id == "a"
+
+
+def test_vecteurs_fichier_aller_retour(tmp_path: Path):
+    m = np.eye(2, DIM, dtype=np.float32)
+    VecteursFichier(["x", "y"], ["e1", "e2"], m, "mod", {"x": ("t1", "integrer"), "y": ("t2", None)}).sauver(tmp_path / "v.npz")
+    v = VecteursFichier.charger(tmp_path / "v.npz")
+    assert v.ids == ["x", "y"] and v.modele == "mod"
+    assert [i for i, _ in v.top(m[1], 2, themes=["t1"])] == ["x"]
