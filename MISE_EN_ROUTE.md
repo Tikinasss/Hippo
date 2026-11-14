@@ -11,7 +11,7 @@ Ce fichier sert de liste de contrôle pour faire vivre le prototype. Une case co
 ### Lancement en une commande (Docker)
 - [x] Docker Desktop installé
 - [x] `docker-compose.yml` : base PostgreSQL + pgvector, API, interface
-- [ ] `docker compose up --build` testé de bout en bout sur ce poste
+- [x] `docker compose up --build` testé de bout en bout sur ce poste (interface, API, base, recherche hybride, décisions)
 - [ ] Testé sur un second poste (clone propre du dépôt)
 
 ### Prérequis hors Docker
@@ -28,7 +28,7 @@ Ce fichier sert de liste de contrôle pour faire vivre le prototype. Une case co
   - [ ] `shift_project_sante.pdf` : The Shift Project, décarboner la santé
   - [ ] `ipcc_ar6_ch7_sm.pdf` : GIEC AR6, chapitre 7, annexe
 - [x] Index par mots-clés construit (`cd backend && python -m hippo.rag build`) : 24 documents, 1 561 passages
-- [ ] Vecteurs calculés pour la recherche par le sens (`python -m hippo.rag embed`) : 800 sur 1 561, la suite est limitée par le quota gratuit Gemini (30 000 tokens par minute)
+- [ ] Vecteurs calculés pour la recherche par le sens (`python -m hippo.rag embed`) : 992 sur 1 561 ; l'offre gratuite Gemini limite à 1 000 passages par jour, relancer demain avec `docker compose up vecteurs`
 - [ ] Index et vecteurs reconstruits une fois les 4 PDF ajoutés
 
 ### Backend (API)
