@@ -6,6 +6,8 @@ Hippo aide une équipe soignante à réduire l'empreinte carbone d'un parcours d
 
 > Principe directeur : l'IA propose, l'équipe soignante décide.
 
+Liste de contrôle du lancement et des données à réunir : [MISE_EN_ROUTE.md](MISE_EN_ROUTE.md).
+
 ## Architecture
 
 | Brique | Rôle | Dossier |
