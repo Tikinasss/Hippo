@@ -51,7 +51,8 @@ export function References({ sources, parametres }: { sources: Source[]; paramet
       </div>
 
       <div className="section-title">
-        <h2>Hypothèses du calcul</h2>
+        <h2>Paramètres du calcul</h2>
+        <span>À remplacer par les valeurs du service dans l&apos;onglet Données locales</span>
       </div>
       <div className="table-wrap">
         <table className="grid">
@@ -68,7 +69,15 @@ export function References({ sources, parametres }: { sources: Source[]; paramet
                     {p.bas} – {p.haut}
                   </div>
                 </td>
-                <td>{p.statut === "hypothese" ? <span className="badge warn">Hypothèse</span> : <span className="badge ok">Sourcée</span>}</td>
+                <td>
+                  {p.statut === "hypothese" && <span className="badge warn">Hypothèse</span>}
+                  {p.statut === "source" && <span className="badge ok">Sourcée</span>}
+                  {p.statut === "local" && (
+                    <span className="badge ok" title={p.origine ?? undefined}>
+                      Donnée du service
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -77,19 +86,19 @@ export function References({ sources, parametres }: { sources: Source[]; paramet
 
       <div className="section-title">
         <h2>Rechercher dans le corpus</h2>
-        <span>Articles et recommandations, surtout en anglais</span>
+        <span>Articles et recommandations, surtout en anglais ; la question peut être posée en français</span>
       </div>
       <form className="search" onSubmit={chercher}>
         <label htmlFor="q-corpus" className="visually-hidden">
           Recherche dans le corpus
         </label>
-        <input id="q-corpus" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ex. local anaesthesia inguinal hernia" />
+        <input id="q-corpus" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ex. anesthésie locale et hernie inguinale" />
         <button className="btn primary" type="submit">
           Chercher
         </button>
       </form>
       {erreur && <div className="alert error">{erreur}</div>}
-      {resultats?.length === 0 && <p className="muted">Aucun résultat. Essayez des mots-clés en anglais.</p>}
+      {resultats?.length === 0 && <p className="muted">Aucun résultat. Essayez d&apos;autres mots, ou en anglais.</p>}
       {resultats?.map((r) => (
         <div className="result" key={r.id}>
           <div>

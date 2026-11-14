@@ -1,7 +1,16 @@
-import { kg, urlFiche } from "@/lib/api";
-import type { Alternative, Decisions, Parcours } from "@/lib/types";
+"use client";
+
+import { useEffect, useState } from "react";
+import { api, dateCourte, kg, urlFiche } from "@/lib/api";
+import type { Alternative, Decisions, HistoriqueDecision, Parcours } from "@/lib/types";
+
+const LIBELLE_STATUT = { retenue: "retient", a_discuter: "met en discussion", aucune: "retire" } as const;
 
 export function ActionPlan({ alternatives, decisions, parcours }: { alternatives: Alternative[]; decisions: Decisions; parcours: Parcours }) {
+  const [historique, setHistorique] = useState<HistoriqueDecision[] | null>(null);
+  useEffect(() => {
+    api.historiqueDecisions().then(setHistorique).catch(() => setHistorique([]));
+  }, [decisions]);
   const titreEtape = (id: string) => parcours.etapes.find((e) => e.id === id)?.titre ?? id;
   const retenues = alternatives.filter((a) => decisions[a.id] === "retenue");
   const discussion = alternatives.filter((a) => decisions[a.id] === "discussion");
@@ -57,6 +66,24 @@ export function ActionPlan({ alternatives, decisions, parcours }: { alternatives
           {discussion.map((a) => (
             <li key={a.id}>
               <strong>{a.titre}</strong> ({titreEtape(a.etape)}) : {a.niveau_preuve}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="section-title">
+        <h2>Historique des décisions</h2>
+        <span>partagé par toute l&apos;équipe</span>
+      </div>
+      {historique === null ? (
+        <p className="muted">Chargement…</p>
+      ) : historique.length === 0 ? (
+        <p className="muted">Aucune décision enregistrée.</p>
+      ) : (
+        <ul className="plain history">
+          {historique.slice(0, 50).map((h, i) => (
+            <li key={i}>
+              <span className="muted">{dateCourte(h.date)}</span> · <strong>{h.auteur}</strong> {LIBELLE_STATUT[h.statut]} « {h.titre} »
+              {h.commentaire && <span className="muted"> : {h.commentaire}</span>}
             </li>
           ))}
         </ul>

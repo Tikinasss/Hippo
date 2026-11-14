@@ -17,8 +17,11 @@ export type Parametre = {
   bas: number;
   haut: number;
   unite: string;
-  statut: "source" | "hypothese";
+  statut: "source" | "hypothese" | "local";
   note: string | null;
+  origine?: string | null;
+  saisi_par?: string | null;
+  saisi_le?: string | null;
 };
 
 export type EtapeParcours = {
@@ -105,7 +108,7 @@ export type Facteur = {
   note: string | null;
 };
 
-export type DetailCalcul = EtapeImpact & { facteurs: Record<string, Facteur> };
+export type DetailCalcul = EtapeImpact & { facteurs: Record<string, Facteur>; parametres: Parametre[] };
 
 export type Reference = {
   numero: number;
@@ -136,3 +139,62 @@ export type ResultatCorpus = {
 
 export type Decision = "retenue" | "discussion";
 export type Decisions = Record<string, Decision>;
+
+// --- Données d'équipe (enregistrées côté serveur) ---------------------------------------
+
+export type StatutServeur = "retenue" | "a_discuter" | "aucune";
+
+export type Equipe = { id: string; etablissement: string; service: string };
+
+export type DecisionServeur = {
+  alternative: string;
+  statut: StatutServeur;
+  auteur: string;
+  commentaire: string | null;
+  date: string;
+};
+
+export type EtatEquipe = {
+  equipe: Equipe;
+  retenues: string[];
+  a_discuter: string[];
+  decisions: DecisionServeur[];
+  valeurs_locales: number;
+};
+
+export type HistoriqueDecision = DecisionServeur & { titre: string };
+
+export type ValeurLocale = {
+  parametre: string;
+  valeur: number | null;
+  bas: number | null;
+  haut: number | null;
+  origine: string | null;
+  auteur: string;
+  date: string;
+  actif?: boolean;
+};
+
+export type ParametreEquipe = {
+  id: string;
+  libelle: string;
+  unite: string;
+  reference: { valeur: number; bas: number; haut: number; statut: string; source: string | null; note: string | null };
+  local: ValeurLocale | null;
+};
+
+export type ParametresEquipe = {
+  parametres: ParametreEquipe[];
+  historique: (ValeurLocale & { libelle: string })[];
+  part_hypotheses: number;
+};
+
+export type Sante = {
+  ok: boolean;
+  stockage: string;
+  recherche: string;
+  assistant_configure: boolean;
+  fournisseur: string;
+  modele?: string;
+  detail?: string;
+};

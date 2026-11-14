@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActionPlan } from "@/components/ActionPlan";
 import { AssistantPanel } from "@/components/AssistantPanel";
 import { Comparison } from "@/components/Comparison";
+import { LocalData } from "@/components/LocalData";
 import { References } from "@/components/References";
 import { StepDetail } from "@/components/StepDetail";
 import { StepsTable } from "@/components/StepsTable";
-import { api, ErreurApi, fourchette, kg, urlFiche } from "@/lib/api";
-import type { Alternative, Decision, Decisions, Impact, Parcours, Source } from "@/lib/types";
+import { api, definirEquipe, ErreurApi, fourchette, kg, urlFiche } from "@/lib/api";
+import type { Alternative, Decision, Decisions, Equipe, EtatEquipe, Impact, Parcours, Source } from "@/lib/types";
 
-const CLE_STOCKAGE = "hippo.decisions.v1";
+const CLE_AUTEUR = "hippo.auteur";
 const SCENARIO_DEMO: Decisions = {
   regroupement_consultations: "retenue",
   bilan_cible: "retenue",
@@ -20,13 +21,21 @@ const SCENARIO_DEMO: Decisions = {
   kit_optimise: "discussion",
   transport_accompagnant: "discussion",
 };
-type Onglet = "parcours" | "comparaison" | "plan" | "references";
+type Onglet = "parcours" | "comparaison" | "plan" | "donnees" | "references";
 
-function lireDecisions(): Decisions {
+// Décisions telles qu'enregistrées par l'équipe (base partagée) -> état de l'écran
+function versDecisions(etat: EtatEquipe): Decisions {
+  return Object.fromEntries([
+    ...etat.retenues.map((a) => [a, "retenue"] as const),
+    ...etat.a_discuter.map((a) => [a, "discussion"] as const),
+  ]);
+}
+
+function lireAuteur(): string {
   try {
-    return JSON.parse(localStorage.getItem(CLE_STOCKAGE) ?? "{}") as Decisions;
+    return localStorage.getItem(CLE_AUTEUR) ?? "";
   } catch {
-    return {};
+    return "";
   }
 }
 
@@ -41,52 +50,105 @@ export default function Page() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [panneau, setPanneau] = useState(false);
   const [question, setQuestion] = useState<{ texte: string; n: number } | null>(null);
+  const [equipe, setEquipe] = useState<Equipe | null>(null);
+  const [auteur, setAuteur] = useState("");
+  const [enCours, setEnCours] = useState(false);
 
   const retenues = useMemo(() => Object.keys(decisions).filter((k) => decisions[k] === "retenue"), [decisions]);
   const discussion = useMemo(() => Object.keys(decisions).filter((k) => decisions[k] === "discussion"), [decisions]);
 
-  useEffect(() => {
-    Promise.all([api.parcours(), api.alternatives(), api.sources()])
-      .then(([p, a, s]) => {
-        setParcours(p);
-        setAlternatives(a);
-        setSources(s);
-        const ids = new Set(a.map((x) => x.id));
-        const demo = new URLSearchParams(window.location.search).get("scenario") === "demo";
-        setDecisions(demo ? SCENARIO_DEMO : Object.fromEntries(Object.entries(lireDecisions()).filter(([k]) => ids.has(k))));
-      })
-      .catch(() => setErreur("Impossible de joindre l'API Hippo. Lancez le backend : uvicorn hippo.api.main:app --port 8000"));
+  // Charge le parcours (avec les valeurs locales de l'équipe), les options, les sources et les décisions.
+  const charger = useCallback(async () => {
+    const [p, a, s, etat] = await Promise.all([api.parcours(), api.alternatives(), api.sources(), api.etat()]);
+    const d = versDecisions(etat);
+    const imp = await api.impact(Object.keys(d).filter((k) => d[k] === "retenue"));
+    setParcours(p);
+    setAlternatives(a);
+    setSources(s);
+    setEquipe(etat.equipe);
+    setDecisions(d);
+    setImpact(imp);
   }, []);
 
-  const recalculer = useCallback(async (d: Decisions, precedentes: Decisions) => {
-    const ret = Object.keys(d).filter((k) => d[k] === "retenue");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    definirEquipe(params.get("equipe") ?? "demo");
+    const ongletUrl = params.get("onglet") as Onglet | null;
+    if (ongletUrl && ["parcours", "comparaison", "plan", "donnees", "references"].includes(ongletUrl)) setOnglet(ongletUrl);
+    setAuteur(lireAuteur());
+    charger()
+      .then(() => setErreur(null))
+      .catch((e) =>
+        setErreur(
+          e instanceof ErreurApi && e.status === 404
+            ? e.message
+            : "Impossible de joindre l'API Hippo. Lancez le backend : uvicorn hippo.api.main:app --port 8000",
+        ),
+      );
+    // les décisions sont partagées : on se resynchronise quand on revient sur l'onglet du navigateur
+    const auRetour = () => {
+      if (document.visibilityState === "visible") charger().catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", auRetour);
+    return () => document.removeEventListener("visibilitychange", auRetour);
+  }, [charger]);
+
+  function changerAuteur(nom: string) {
+    setAuteur(nom);
     try {
-      setImpact(await api.impact(ret));
-      setDecisions(d);
-      try {
-        localStorage.setItem(CLE_STOCKAGE, JSON.stringify(d));
-      } catch {
-        /* stockage indisponible : la session continue sans mémorisation */
+      localStorage.setItem(CLE_AUTEUR, nom);
+    } catch {
+      /* stockage indisponible : le nom reste pour la session */
+    }
+  }
+
+  function exigerAuteur() {
+    if (auteur.trim()) return true;
+    setErreur("Indiquez votre nom en haut de la page : chaque décision est enregistrée à votre nom.");
+    document.getElementById("auteur")?.focus();
+    return false;
+  }
+
+  async function appliquer(changements: [string, Decision | null][]) {
+    if (!exigerAuteur()) return;
+    setEnCours(true);
+    try {
+      let etat: EtatEquipe | null = null;
+      for (const [alt, decision] of changements) {
+        const statut = decision === "retenue" ? "retenue" : decision === "discussion" ? "a_discuter" : "aucune";
+        etat = await api.decider(alt, statut, auteur.trim());
+      }
+      if (etat) {
+        const d = versDecisions(etat);
+        setDecisions(d);
+        setImpact(await api.impact(Object.keys(d).filter((k) => d[k] === "retenue")));
       }
       setErreur(null);
     } catch (e) {
-      setDecisions(precedentes);
       setErreur(e instanceof ErreurApi && e.status === 409 ? e.message : (e as Error).message);
+      await charger().catch(() => undefined);
+    } finally {
+      setEnCours(false);
     }
-  }, []);
-
-  useEffect(() => {
-    if (parcours) void recalculer(decisions, {});
-    // premier calcul une fois les données chargées
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parcours]);
+  }
 
   function decider(alt: string, decision: Decision | null) {
-    const suivantes = { ...decisions };
-    if (decision) suivantes[alt] = decision;
-    else delete suivantes[alt];
-    void recalculer(suivantes, decisions);
+    void appliquer([[alt, decision]]);
   }
+
+  function chargerScenario(cible: Decisions) {
+    // on retire d'abord ce qui n'est pas dans la cible (évite un conflit transitoire), puis on applique la cible
+    const retraits = Object.keys(decisions)
+      .filter((a) => !(a in cible))
+      .map((a) => [a, null] as [string, Decision | null]);
+    const ajouts = Object.entries(cible).filter(([a, d]) => decisions[a] !== d) as [string, Decision | null][];
+    void appliquer([...retraits, ...ajouts]);
+  }
+
+  const surErreur = useCallback((m: string) => setErreur(m), []);
+  const apresSaisie = useCallback(() => {
+    charger().catch((e: Error) => setErreur(e.message));
+  }, [charger]);
 
   function demander(texte: string) {
     setPanneau(true);
@@ -104,7 +166,11 @@ export default function Page() {
           <span>Écoconception des parcours de soins</span>
         </div>
         <div className="spacer" />
-        <span className="context">Chirurgie ambulatoire · CHU de démonstration</span>
+        <span className="context">{equipe ? `${equipe.service} · ${equipe.etablissement}` : ""}</span>
+        <label className="whoami">
+          <span>Vous êtes</span>
+          <input id="auteur" value={auteur} onChange={(e) => changerAuteur(e.target.value)} placeholder="Nom, fonction" maxLength={120} />
+        </label>
         <button type="button" className="btn small outline panel-toggle" onClick={() => setPanneau((o) => !o)} aria-expanded={panneau}>
           Assistant
         </button>
@@ -130,12 +196,12 @@ export default function Page() {
           <h2>Démonstration</h2>
           <ul>
             <li>
-              <button type="button" onClick={() => void recalculer(SCENARIO_DEMO, decisions)}>
+              <button type="button" disabled={enCours} onClick={() => chargerScenario(SCENARIO_DEMO)}>
                 Charger le scénario de démo
               </button>
             </li>
             <li>
-              <button type="button" onClick={() => void recalculer({}, decisions)}>
+              <button type="button" disabled={enCours} onClick={() => chargerScenario({})}>
                 Revenir au parcours actuel
               </button>
             </li>
@@ -143,16 +209,21 @@ export default function Page() {
         </nav>
 
         <main className="main">
-          <div className="crumbs">Parcours de soins › Chirurgie ambulatoire</div>
+          <div className="crumbs">Parcours de soins › {equipe?.service ?? "Chirurgie ambulatoire"}</div>
           <div className="page-head">
             <div>
               <h1>{parcours?.titre ?? "Cure de hernie inguinale"}</h1>
               <p>
                 {parcours?.description ?? "Parcours ambulatoire"}{" "}
-                {impact && impact.part_hypotheses > 0.5 && (
-                  <span className="badge demo" title="Une partie des valeurs repose sur des hypothèses à valider">
+                {impact && impact.part_hypotheses > 0 && (
+                  <button
+                    type="button"
+                    className="badge demo as-link"
+                    onClick={() => setOnglet("donnees")}
+                    title="Remplacer les hypothèses par les valeurs réelles du service"
+                  >
                     {Math.round(100 * impact.part_hypotheses)} % d&apos;hypothèses à valider
-                  </span>
+                  </button>
                 )}
               </p>
             </div>
@@ -178,6 +249,7 @@ export default function Page() {
                 ["parcours", "Parcours"],
                 ["comparaison", "Comparaison avant / après"],
                 ["plan", `Plan d'action (${retenues.length})`],
+                ["donnees", "Données locales"],
                 ["references", "Références"],
               ] as [Onglet, string][]
             ).map(([id, label]) => (
@@ -245,6 +317,7 @@ export default function Page() {
           )}
           {impact && onglet === "comparaison" && <Comparison impact={impact} />}
           {parcours && onglet === "plan" && <ActionPlan alternatives={alternatives} decisions={decisions} parcours={parcours} />}
+          {parcours && onglet === "donnees" && <LocalData auteur={auteur.trim()} onChange={apresSaisie} onErreur={surErreur} />}
           {parcours && onglet === "references" && <References sources={sources} parametres={parcours.parametres} />}
         </main>
 
