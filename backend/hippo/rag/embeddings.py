@@ -32,6 +32,10 @@ _PRESETS = {
 }
 
 
+class QuotaJournalierEpuise(RuntimeError):
+    """Inutile de réessayer avant le lendemain (offre gratuite : 1 000 textes par jour chez Gemini)."""
+
+
 class Embeddeur:
     def __init__(self, fournisseur: str, client=None) -> None:
         p = _PRESETS[fournisseur]
@@ -52,7 +56,7 @@ class Embeddeur:
             self._client = OpenAI(base_url=self._base_url, api_key=self._cle, timeout=30, max_retries=2)
         return self._client
 
-    def encoder(self, textes: list[str], lot: int = 100, tentatives: int = 6) -> np.ndarray:
+    def encoder(self, textes: list[str], lot: int = 32, tentatives: int = 8) -> np.ndarray:
         """Vecteurs normalisés (norme 1), forme (n, DIM). Attend et réessaie si le débit est limité."""
         import openai
 
@@ -64,10 +68,14 @@ class Embeddeur:
                 try:
                     r = self.client.embeddings.create(model=self.modele, input=morceau, **kw)
                     break
-                except openai.RateLimitError:
+                except openai.RateLimitError as exc:
                     if essai == tentatives - 1:
                         raise
-                    time.sleep(min(60, 5 * 2 ** essai))  # offres gratuites : quelques requêtes par minute
+                    if "per day" in str(exc).lower() or "perday" in str(exc).lower():
+                        raise QuotaJournalierEpuise(
+                            "quota journalier du fournisseur d'embeddings atteint : le calcul reprendra demain "
+                            "là où il s'est arrêté") from exc
+                    time.sleep(min(65, 15 * (essai + 1)))  # offre gratuite Gemini : 30 000 tokens par minute
             data = list(r.data)
             if all(getattr(d, "index", None) is not None for d in data):  # Gemini ne renvoie pas toujours l'index
                 data.sort(key=lambda d: d.index)
@@ -180,7 +188,7 @@ class VecteursPostgres:
 
 
 def indexer_vecteurs(chunks: list[dict], embeddeur: Embeddeur, path: Path = VECTEURS_PATH,
-                     url_base: str | None = None, journal=print, lot: int = 100) -> dict:
+                     url_base: str | None = None, journal=print, lot: int = 32) -> dict:
     """Calcule les vecteurs manquants (les passages inchangés sont réutilisés) et les range.
 
     Le fichier est réécrit après chaque lot : une interruption (quota, réseau) ne fait
@@ -203,17 +211,24 @@ def indexer_vecteurs(chunks: list[dict], embeddeur: Embeddeur, path: Path = VECT
                         embeddeur.modele, meta).sauver(path)
         return presents
 
-    for n in range(0, len(a_faire), lot):
-        bloc = a_faire[n:n + lot]
-        for j, v in zip(bloc, embeddeur.encoder([texte_a_encoder(chunks[j]) for j in bloc], lot=lot)):
-            connus[empreintes[j]] = v
-        sauver()
-        journal(f"  {min(n + lot, len(a_faire))}/{len(a_faire)}")
+    def ranger_en_base(presents: list[int]) -> None:
+        if url_base:
+            VecteursPostgres(url_base, embeddeur.modele).remplacer(
+                [(chunks[j]["id"], chunks[j]["doc_id"], meta[chunks[j]["id"]][0], meta[chunks[j]["id"]][1],
+                  empreintes[j], connus[empreintes[j]]) for j in presents])
+
+    calcules = 0
+    try:
+        for n in range(0, len(a_faire), lot):
+            bloc = a_faire[n:n + lot]
+            for j, v in zip(bloc, embeddeur.encoder([texte_a_encoder(chunks[j]) for j in bloc], lot=lot)):
+                connus[empreintes[j]] = v
+            calcules += len(bloc)
+            sauver()
+            journal(f"  {min(n + lot, len(a_faire))}/{len(a_faire)}")
+    except Exception:
+        ranger_en_base(sauver())  # ce qui est calculé sert tout de suite, la suite viendra plus tard
+        raise
     presents = sauver()
-    stats = {"passages": len(presents), "calcules": len(a_faire), "fichier": str(path), "base": False}
-    if url_base:
-        VecteursPostgres(url_base, embeddeur.modele).remplacer(
-            [(chunks[j]["id"], chunks[j]["doc_id"], meta[chunks[j]["id"]][0], meta[chunks[j]["id"]][1], empreintes[j],
-              connus[empreintes[j]]) for j in presents])
-        stats["base"] = True
-    return stats
+    ranger_en_base(presents)
+    return {"passages": len(presents), "calcules": calcules, "fichier": str(path), "base": bool(url_base)}

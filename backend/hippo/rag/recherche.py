@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
-from functools import lru_cache
+import time
 
 from .bm25 import tokenize
 from .embeddings import Embeddeur, VecteursFichier, VecteursPostgres, creer_embeddeur
@@ -56,8 +56,22 @@ class MoteurRecherche:
         return idx.hits(classement, k=k, per_doc=per_doc)
 
 
-@lru_cache(maxsize=1)
+_RAFRAICHIR_S = 300  # les vecteurs calculés en arrière-plan sont pris en compte sans redémarrer
+_cache: dict = {}
+_connexions: dict = {}
+
+
 def moteur_recherche() -> MoteurRecherche:
+    now = time.monotonic()
+    if "moteur" not in _cache or now - _cache["date"] > _RAFRAICHIR_S:
+        _cache.update(moteur=_construire(), date=now)
+    return _cache["moteur"]
+
+
+moteur_recherche.cache_clear = _cache.clear  # même interface qu'un lru_cache (tests, reconstruction d'index)
+
+
+def _construire() -> MoteurRecherche:
     try:
         embeddeur = creer_embeddeur()
     except ValueError as exc:
@@ -68,7 +82,10 @@ def moteur_recherche() -> MoteurRecherche:
         url = os.environ.get("DATABASE_URL")
         try:
             if url:
-                v = VecteursPostgres(url, embeddeur.modele)
+                cle = (url, embeddeur.modele)
+                if cle not in _connexions:  # un seul pool de connexions, réutilisé à chaque rafraîchissement
+                    _connexions[cle] = VecteursPostgres(url, embeddeur.modele)
+                v = _connexions[cle]
                 vecteurs = v if v.nombre() else None
             if vecteurs is None:
                 v = VecteursFichier.charger()

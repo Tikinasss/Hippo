@@ -1,0 +1,75 @@
+# Hippo en une commande :   docker compose up --build
+#   interface  http://localhost:3000
+#   API        http://localhost:8000/docs
+# Les clés des modèles se mettent dans backend/.env (voir backend/.env.example).
+name: hippo
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hippo
+      POSTGRES_PASSWORD: ${HIPPO_DB_PASSWORD:-hippo}
+      POSTGRES_DB: hippo
+    ports:
+      - "127.0.0.1:5433:5432"   # 5433 : ne gêne pas un PostgreSQL déjà installé sur le poste
+    volumes:
+      - hippo-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hippo -d hippo"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://hippo:${HIPPO_DB_PASSWORD:-hippo}@db:5432/hippo
+      HIPPO_CORS_ORIGINS: http://localhost:3000
+    volumes:
+      - ./corpus:/app/corpus      # corpus et index restent sur le poste (licences)
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Calcule en une fois les vecteurs manquants du corpus (recherche par le sens), puis s'arrête.
+  # L'offre gratuite Gemini plafonne à 1 000 passages par jour : relancer le lendemain avec
+  #   docker compose up vecteurs
+  vecteurs:
+    image: hippo-backend
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://hippo:${HIPPO_DB_PASSWORD:-hippo}@db:5432/hippo
+    volumes:
+      - ./corpus:/app/corpus
+    command: ["python", "-m", "hippo.preparer", "--vecteurs"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        HIPPO_API_URL: http://backend:8000
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  hippo-db:

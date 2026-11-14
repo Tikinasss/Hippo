@@ -8,7 +8,13 @@ Ce fichier sert de liste de contrôle pour faire vivre le prototype. Une case co
 
 ## 1. Lancer le prototype sur un poste
 
-### Prérequis
+### Lancement en une commande (Docker)
+- [x] Docker Desktop installé
+- [x] `docker-compose.yml` : base PostgreSQL + pgvector, API, interface
+- [ ] `docker compose up --build` testé de bout en bout sur ce poste
+- [ ] Testé sur un second poste (clone propre du dépôt)
+
+### Prérequis hors Docker
 - [x] Python 3.11 ou plus récent
 - [x] Node.js 20 ou plus récent
 - [x] Dépôt cloné, branche `main` à jour avec GitHub
@@ -21,29 +27,39 @@ Ce fichier sert de liste de contrôle pour faire vivre le prototype. Une case co
   - [ ] `sfar_reduction_impact_ag.pdf` : SFAR, réduire l'impact de l'anesthésie générale (2023)
   - [ ] `shift_project_sante.pdf` : The Shift Project, décarboner la santé
   - [ ] `ipcc_ar6_ch7_sm.pdf` : GIEC AR6, chapitre 7, annexe
-- [x] Index construit (`cd backend && python -m hippo.rag build`) : 24 documents, 1 561 passages
-- [ ] Index reconstruit une fois les 4 PDF ajoutés
+- [x] Index par mots-clés construit (`cd backend && python -m hippo.rag build`) : 24 documents, 1 561 passages
+- [ ] Vecteurs calculés pour la recherche par le sens (`python -m hippo.rag embed`) : 800 sur 1 561, la suite est limitée par le quota gratuit Gemini (30 000 tokens par minute)
+- [ ] Index et vecteurs reconstruits une fois les 4 PDF ajoutés
 
 ### Backend (API)
 - [x] Environnement virtuel créé dans `backend/.venv`
 - [x] Dépendances installées (`pip install -e ".[dev]"`)
-- [x] 43 tests au vert (`python -m pytest`)
+- [x] 54 tests au vert (`python -m pytest`), dont le stockage PostgreSQL
 - [x] Fichier `backend/.env` créé, jamais commité
   - [x] `OPENROUTER_API_KEY` renseignée
   - [x] `GEMINI_API_KEY` renseignée (secours)
   - [x] `HIPPO_MODEL=dots-studio/dots-3-note-preview:free`
   - [ ] `HIPPO_LLM_PROVIDER=openrouter` à écrire explicitement. Il est vide pour l'instant ; OpenRouter est quand même choisi d'après la clé présente.
 - [x] API lancée : `uvicorn hippo.api.main:app --reload --port 8000`
-- [ ] Vérifier http://localhost:8000/api/sante : `"fournisseur": "openrouter"` et le modèle Dots
+- [x] http://localhost:8000/api/sante affiche `openrouter`, le modèle Dots, `"stockage": "PostgreSQL"` et `"recherche": "hybride"`
+
+### Base de données
+- [x] PostgreSQL 17 + pgvector dans Docker (port 5433 du poste)
+- [x] Migrations versionnées appliquées au démarrage (`backend/hippo/store/migrations/`)
+- [x] Décisions, valeurs locales et conversations enregistrées et relues après redémarrage
+- [ ] Sauvegarde de la base planifiée (`docker compose exec db pg_dump -U hippo hippo > sauvegarde.sql`)
 
 ### Frontend (interface)
 - [x] Dépendances installées (`cd frontend && npm install`)
 - [x] Lint et build sans erreur
 - [x] Interface lancée : `npm run dev`, puis http://localhost:3000
-- [x] Scénario de démonstration : http://localhost:3000/?scenario=demo
+- [x] Scénario de démonstration : bouton « Charger le scénario de démo » dans le menu de gauche
+- [x] Décisions signées (« Vous êtes ») et partagées entre les postes
+- [x] Onglet Données locales : saisie des valeurs du service, historique, retour à l'hypothèse
 
 ### Assistant IA
-- [x] Testé de bout en bout avec Dots3-Note sur OpenRouter : réponses en 16 à 31 s, chiffres et citations contrôlés
+- [x] Testé de bout en bout avec Dots3-Note sur OpenRouter : réponses en 16 à 37 s, chiffres et citations contrôlés
+- [x] Conversations enregistrées en base
 - [ ] Testé de bout en bout avec Gemini 3.8 Flash : le modèle était surchargé chez Google pendant le test
 - [ ] Choisir le modèle du jour J et faire 5 questions de répétition la veille
 
@@ -51,7 +67,10 @@ Ce fichier sert de liste de contrôle pour faire vivre le prototype. Une case co
 
 ## 2. Données : ce qu'on a, ce qu'il faut obtenir
 
-Le calcul repose aujourd'hui à **87 % sur des hypothèses**. Chaque valeur réelle obtenue auprès de l'établissement rend le résultat plus crédible. Les valeurs se modifient dans `backend/hippo/data/`.
+Le calcul repose aujourd'hui à **87 % sur des hypothèses**. Chaque valeur réelle obtenue auprès de l'établissement rend le résultat plus crédible.
+
+- Les **paramètres du service** (distances, énergie, volumes) se saisissent dans l'onglet **Données locales** de l'interface, avec leur origine : pas besoin de toucher au code. À elle seule, la distance réelle domicile–hôpital fait passer la part d'hypothèses de 87 % à environ 22 %.
+- Les **facteurs d'émission** et les **sources** restent dans `backend/hippo/data/`, car ils sont communs à tous les établissements.
 
 ### Facteurs d'émission (`facteurs.json`)
 
@@ -115,7 +134,12 @@ Ce sont les données locales qui pèsent le plus. À demander au service, aux se
 - [x] Interface Next.js : parcours, comparaison, plan d'action, références, panneau assistant
 - [x] Assistant avec outils et garde-fous : citations contrôlées, chiffres tracés, blocage si non sourcé
 - [x] Plusieurs fournisseurs de modèle : Claude, OpenRouter, Mistral, Gemini, Ollama
+- [x] Base de données PostgreSQL, décisions partagées et historisées, valeurs locales par équipe
+- [x] Recherche hybride : mots-clés et sens (une question en français trouve les passages en anglais)
+- [x] Lancement Docker en une commande
 - [ ] Affichage progressif des étapes de l'assistant pendant qu'il réfléchit (facultatif)
+- [ ] Authentification des utilisateurs (aujourd'hui, le nom saisi n'est pas vérifié)
+- [ ] Hébergement sur un serveur accessible à l'équipe (HTTPS)
 
 ---
 
