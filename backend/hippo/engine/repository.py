@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
+from typing import Iterable, Protocol
 
 from .. import config
 from .models import Activite, Alternative, Facteur, Parametre, Parcours, Source
@@ -12,6 +13,16 @@ from .models import Activite, Alternative, Facteur, Parametre, Parcours, Source
 
 class DonneesInvalides(ValueError):
     pass
+
+
+class ValeurLocaleLike(Protocol):
+    parametre: str
+    valeur: float | None
+    bas: float | None
+    haut: float | None
+    origine: str | None
+    auteur: str
+    date: str
 
 
 @dataclass(frozen=True)
@@ -27,6 +38,26 @@ class Referentiel:
 
     def etape(self, etape_id: str):
         return next(e for e in self.parcours.etapes if e.id == etape_id)
+
+    def avec_valeurs_locales(self, valeurs: Iterable[ValeurLocaleLike]) -> "Referentiel":
+        """Référentiel où les hypothèses sont remplacées par les valeurs réelles saisies par l'équipe."""
+        par_id = {v.parametre: v for v in valeurs}
+        if not par_id:
+            return self
+        inconnus = set(par_id) - set(self.parametres)
+        if inconnus:
+            raise KeyError(f"paramètres inconnus : {', '.join(sorted(inconnus))}")
+        params = []
+        for p in self.parcours.parametres:
+            v = par_id.get(p.id)
+            if v is not None:
+                p = Parametre.model_validate({
+                    **p.model_dump(), "valeur": v.valeur,
+                    "bas": v.valeur if v.bas is None else v.bas, "haut": v.valeur if v.haut is None else v.haut,
+                    "statut": "local", "source": None, "origine": v.origine, "saisi_par": v.auteur, "saisi_le": v.date,
+                })
+            params.append(p)
+        return replace(self, parcours=self.parcours.model_copy(update={"parametres": params}))
 
     def alternatives_de(self, etape_id: str) -> list[Alternative]:
         return [a for a in self.alternatives.values() if a.etape == etape_id]

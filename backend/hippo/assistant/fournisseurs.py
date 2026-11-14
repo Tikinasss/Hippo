@@ -86,8 +86,11 @@ class FournisseurAnthropic:
             r.stop_reason, "fin")
         appels = [AppelOutil(b.id, b.name, dict(b.input)) for b in r.content if b.type == "tool_use"]
         texte = "".join(b.text for b in r.content if b.type == "text").strip()
-        # le contenu complet (réflexion comprise) est renvoyé tel quel au tour suivant
-        return Tour(fin=fin, texte=texte, appels=appels, message={"role": "assistant", "content": r.content})
+        # le contenu complet (réflexion comprise) est renvoyé tel quel au tour suivant, sous forme de
+        # dictionnaires pour que la conversation puisse être enregistrée en base
+        contenu = [b.model_dump(mode="json", exclude_none=True) if hasattr(b, "model_dump") else dict(vars(b))
+                   for b in r.content]
+        return Tour(fin=fin, texte=texte, appels=appels, message={"role": "assistant", "content": contenu})
 
     def message_utilisateur(self, textes: list[str]) -> list:
         return [{"role": "user", "content": [{"type": "text", "text": t} for t in textes]}]

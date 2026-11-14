@@ -45,9 +45,13 @@ class Parametre(BaseModel):
     bas: float
     haut: float
     unite: str
-    statut: Literal["source", "hypothese"] = "hypothese"
+    statut: Literal["source", "hypothese", "local"] = Field(
+        "hypothese", description="local : valeur réelle saisie par l'équipe de l'établissement")
     source: str | None = None
     note: str | None = None
+    origine: str | None = Field(None, description="Pour une valeur locale : d'où vient le chiffre (DIM, services techniques…)")
+    saisi_par: str | None = None
+    saisi_le: str | None = None
 
     @model_validator(mode="after")
     def _ordre(self) -> "Parametre":
